@@ -1,0 +1,697 @@
+# Git Repository Index for AI Review
+# Generated on: 2025-08-13T13:23:02-04:00
+# Repo: /home/vizion/Code/VideoLinksBrowserExtension
+# Total files indexed: 12
+
+## FILE: background.js
+### Metadata
+- Size: 1995 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+// background.js (MV3 service worker)
+
+const GALLERY_PATH = "gallery.html";
+
+// Create context menu to save from linked images
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "vidtab-save-image-link",
+    title: "Save to VidTab Gallery",
+    contexts: ["image"]
+  });
+});
+
+// Clicking the extension icon opens gallery
+chrome.action.onClicked.addListener(openGalleryTab);
+
+// Handle messages from popup or content script
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "OPEN_GALLERY") {
+    openGalleryTab().then(() => sendResponse({ ok: true }));
+    return true; // keep port open for async
+  }
+
+  if (msg?.type === "SAVE_ITEM_FROM_CONTEXT") {
+    addItem(msg.payload)
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true; // keep port open for async
+  }
+});
+
+// Context menu click handler
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "vidtab-save-image-link") return;
+
+  const payload = {
+    id: makeId(),
+    url: info.linkUrl || info.pageUrl,
+    img: info.srcUrl,
+    title: tab?.title || info.linkUrl || info.pageUrl,
+    sourcePageUrl: info.pageUrl,
+    tags: [],
+    createdAt: Date.now()
+  };
+  await addItem(payload);
+});
+
+function makeId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function addItem(item) {
+  const data = await chrome.storage.local.get({ items: [] });
+  const items = data.items;
+
+  // Prevent duplicates
+  if (!items.some(x => x.url === item.url && x.img === item.img)) {
+    items.unshift(item);
+    await chrome.storage.local.set({ items });
+  }
+}
+
+async function openGalleryTab() {
+  const url = chrome.runtime.getURL(GALLERY_PATH);
+  const tabs = await chrome.tabs.query({ url });
+
+  if (tabs.length > 0) {
+    await chrome.tabs.update(tabs[0].id, { active: true });
+  } else {
+    await chrome.tabs.create({ url });
+  }
+}
+
+================================================================================
+
+## FILE: contentScript.js
+### Metadata
+- Size: 2334 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+// Inject "+ Save" button on hover for linked images
+const BTN_CLASS = "vv-save-btn";
+const WRAP_CLASS = "vv-rel";
+const processed = new WeakSet();
+let toastEl = null;
+init();
+function init() {
+  injectToast();
+  scanDocumentForLinkedImages();
+  observeMutations();
+}
+function observeMutations() {
+  const obs = new MutationObserver(() => {
+    scanDocumentForLinkedImages();
+  });
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+}
+function scanDocumentForLinkedImages() {
+  const aTags = Array.from(document.querySelectorAll("a"));
+  let candidates = [];
+  aTags.forEach(a => {
+    const img = a.querySelector("img");
+    if (img) candidates.push({ a, img });
+  });
+  candidates.forEach(({ a, img }) => {
+    if (!a || !img) return;
+    if (processed.has(a)) return;
+    processed.add(a);
+    a.classList.add(WRAP_CLASS);
+    const btn = document.createElement("button");
+    btn.className = BTN_CLASS;
+    btn.textContent = "＋ Save";
+    btn.title = "Save to VidTab Gallery";
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const payload = {
+        id: makeId(),
+        url: absolutizeUrl(a.getAttribute("href")),
+        img: absolutizeUrl(img.getAttribute("src")),
+        title: img.getAttribute("alt") || a.getAttribute("title") || document.title || a.href,
+        sourcePageUrl: location.href,
+        tags: [],
+        createdAt: Date.now()
+      };
+      try {
+        await chrome.runtime.sendMessage({ type: "SAVE_ITEM_FROM_CONTEXT", payload });
+        showToast("Saved to VidTab Gallery ✔️");
+      } catch (err) {
+        showToast("Couldn’t save. Check extension permissions.");
+        console.error(err);
+      }
+    });
+    a.appendChild(btn);
+  });
+}
+function absolutizeUrl(u) {
+  try { return new URL(u, location.href).toString(); } catch { return u; }
+}
+function makeId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+function injectToast() {
+  if (toastEl) return;
+  toastEl = document.createElement("div");
+  toastEl.id = "vv-toast";
+  document.documentElement.appendChild(toastEl);
+}
+function showToast(msg, ms = 1800) {
+  if (!toastEl) injectToast();
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  setTimeout(() => toastEl && toastEl.classList.remove("show"), ms);
+}
+================================================================================
+
+## FILE: contentStyles.css
+### Metadata
+- Size: 798 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+/* Overlay button */
+.vv-rel { position: relative !important; }
+.vv-save-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2147483647;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.vv-rel:hover .vv-save-btn { opacity: 1; }
+#vv-toast {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  background: #111;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.25);
+  font: 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  z-index: 2147483647;
+  display: none;
+}
+#vv-toast.show { display: block; }
+================================================================================
+
+## FILE: gallery.css
+### Metadata
+- Size: 2859 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+:root {
+  --bg: #0b0d10;
+  --panel: #12161b;
+  --muted: #9aa4af;
+  --text: #e8edf2;
+  --accent: #3ea6ff;
+  --danger: #ff5d6c;
+  --ok: #37d67a;
+  --border: #243040;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: radial-gradient(1200px 600px at 100% -5%, #131a22, #0b0d10);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.topbar h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: .2px;
+}
+.topbar .actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+input[type="search"], input[type="text"] {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  min-width: 280px;
+  outline: none;
+}
+button {
+  appearance: none;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+
+main {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  padding: 16px;
+}
+
+.sidebar {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(18,22,27,0.8);
+}
+.sidebar h2 {
+  margin-top: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-cloud .tag {
+  padding: 4px 8px;
+  background: #16202b;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tag.active { color: #fff; border-color: var(--accent); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  background: rgba(18,22,27,0.8);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.card .thumb {
+  display: block;
+  background: #000;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  position: relative;
+}
+.card .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.meta { padding: 10px; display: grid; gap: 8px; }
+.meta .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.meta .link {
+  color: var(--muted);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.buttons { display: flex; gap: 6px; }
+button.save { border-color: #2b7a47; }
+button.save:hover { background: rgba(55,214,122,0.1); }
+button.delete { border-color: #7a2b35; color: #ff96a1; }
+button.delete:hover { background: rgba(255,93,108,0.08); }
+
+================================================================================
+
+## FILE: gallery.html
+### Metadata
+- Size: 1536 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>VidTab Gallery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="gallery.css" />
+</head>
+<body>
+<header class="topbar">
+  <h1>VidTab Gallery</h1>
+  <div class="actions">
+    <input id="search" type="search" placeholder="Search title, URL, or tags…" />
+    <button id="edit-mode" title="Batch edit">Edit</button>
+    <button id="delete-mode" title="Batch delete">Delete</button>
+    <button id="clear-all" title="Remove everything">Clear All</button>
+  </div>
+</header>
+
+<section id="global-edit-panel" style="display:none; padding:10px; background:#12161b; border-bottom:1px solid var(--border);">
+  <input id="global-title" type="text" placeholder="New title (optional)" />
+  <input id="global-tags" type="text" placeholder="Comma,separated,tags (optional)" />
+  <button id="apply-global">Apply to selected</button>
+</section>
+
+<main>
+  <aside class="sidebar">
+    <h2>Tags</h2>
+    <div id="tag-cloud" class="tag-cloud"></div>
+  </aside>
+  <section class="grid" id="grid"></section>
+</main>
+
+<template id="card-tpl">
+  <article class="card">
+    <a class="thumb" target="_blank" rel="noreferrer noopener">
+      <img loading="lazy" alt="" />
+    </a>
+    <div class="meta">
+      <div class="title"></div>
+      <div class="row">
+        <a class="link" target="_blank" rel="noreferrer noopener"></a>
+      </div>
+    </div>
+  </article>
+</template>
+
+<script src="gallery.js"></script>
+</body>
+</html>
+
+================================================================================
+
+## FILE: gallery.js
+### Metadata
+- Size: 5716 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+const grid = document.getElementById("grid");
+const searchInput = document.getElementById("search");
+const clearAllBtn = document.getElementById("clear-all");
+const tagCloud = document.getElementById("tag-cloud");
+const cardTpl = document.getElementById("card-tpl");
+
+const editModeBtn = document.getElementById("edit-mode");
+const deleteModeBtn = document.getElementById("delete-mode");
+const globalEditPanel = document.getElementById("global-edit-panel");
+const applyGlobalBtn = document.getElementById("apply-global");
+const globalTitle = document.getElementById("global-title");
+const globalTags = document.getElementById("global-tags");
+
+let items = [];
+let activeTag = null;
+let searchTerm = "";
+let batchMode = null; // "edit" | "delete" | null
+
+(async function init() {
+  await loadItems();
+  renderAll();
+
+  searchInput.addEventListener("input", () => {
+    searchTerm = searchInput.value.trim().toLowerCase();
+    renderAll();
+  });
+
+  clearAllBtn.addEventListener("click", async () => {
+    if (!confirm("Delete ALL saved items? This cannot be undone.")) return;
+    items = [];
+    await chrome.storage.local.set({ items });
+    renderAll();
+  });
+
+  editModeBtn.addEventListener("click", () => {
+    batchMode = batchMode === "edit" ? null : "edit";
+    globalEditPanel.style.display = batchMode === "edit" ? "block" : "none";
+    renderAll();
+  });
+
+  deleteModeBtn.addEventListener("click", async () => {
+    if (batchMode === "delete") {
+      const checked = getCheckedIds();
+      if (checked.length && confirm(`Delete ${checked.length} items?`)) {
+        items = items.filter(it => !checked.includes(it.id));
+        await chrome.storage.local.set({ items });
+      }
+      batchMode = null;
+      renderAll();
+    } else {
+      batchMode = "delete";
+      globalEditPanel.style.display = "none";
+      renderAll();
+    }
+  });
+
+  applyGlobalBtn.addEventListener("click", async () => {
+    const checked = getCheckedIds();
+    if (!checked.length) return;
+
+    const titleVal = globalTitle.value.trim();
+    const tagsVal = parseTags(globalTags.value);
+
+    items = items.map(it => {
+      if (checked.includes(it.id)) {
+        return {
+          ...it,
+          title: titleVal || it.title,
+          tags: tagsVal.length ? Array.from(new Set([...(it.tags || []), ...tagsVal])) : it.tags
+        };
+      }
+      return it;
+    });
+    await chrome.storage.local.set({ items });
+
+    globalTitle.value = "";
+    globalTags.value = "";
+    batchMode = null;
+    globalEditPanel.style.display = "none";
+    renderAll();
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.items) {
+      items = changes.items.newValue || [];
+      renderAll();
+    }
+  });
+})();
+
+async function loadItems() {
+  const data = await chrome.storage.local.get({ items: [] });
+  items = data.items;
+}
+
+function renderAll() {
+  const filtered = filterItems(items, searchTerm, activeTag);
+  renderTagCloud(items, activeTag);
+  renderGrid(filtered);
+}
+
+function filterItems(list, term, tag) {
+  return list.filter(it => {
+    const hitTag = tag ? (it.tags || []).map(t => t.toLowerCase()).includes(tag.toLowerCase()) : true;
+    const hay = `${it.title} ${it.url} ${(it.tags || []).join(" ")}`.toLowerCase();
+    const hitTerm = term ? hay.includes(term) : true;
+    return hitTag && hitTerm;
+  });
+}
+
+function renderTagCloud(list, active) {
+  const counts = new Map();
+  list.forEach(it => (it.tags || []).forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+
+  tagCloud.innerHTML = "";
+  const all = document.createElement("span");
+  all.className = `tag ${active ? "" : "active"}`;
+  all.textContent = "All";
+  all.title = "Show all items";
+  all.addEventListener("click", () => {
+    activeTag = null;
+    renderAll();
+  });
+  tagCloud.appendChild(all);
+
+  Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 100)
+    .forEach(([tag, count]) => {
+      const span = document.createElement("span");
+      span.className = `tag ${active === tag ? "active" : ""}`;
+      span.textContent = `${tag} (${count})`;
+      span.title = `Filter by ${tag}`;
+      span.addEventListener("click", () => {
+        activeTag = active === tag ? null : tag;
+        renderAll();
+      });
+      tagCloud.appendChild(span);
+    });
+}
+
+function renderGrid(list) {
+  grid.innerHTML = "";
+  if (list.length === 0) {
+    const empty = document.createElement("div");
+    empty.style.opacity = ".7";
+    empty.textContent = "No items yet. Save by clicking “＋ Save” on a linked image.";
+    grid.appendChild(empty);
+    return;
+  }
+
+  list.forEach(item => {
+    const node = cardTpl.content.firstElementChild.cloneNode(true);
+
+    const aThumb = node.querySelector(".thumb");
+    const img = node.querySelector("img");
+    const titleDiv = node.querySelector(".title");
+    const linkA = node.querySelector(".link");
+
+    if (batchMode) {
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "select-card";
+      cb.dataset.id = item.id;
+      cb.style.margin = "6px";
+      node.prepend(cb);
+    }
+
+    aThumb.href = item.url;
+    img.src = item.img;
+    img.alt = item.title || "";
+    titleDiv.textContent = item.title || "";
+
+    linkA.href = item.url;
+    linkA.textContent = truncate(item.url, 48);
+    linkA.title = item.url;
+
+    grid.appendChild(node);
+  });
+}
+
+function truncate(str, n) {
+  return str.length > n ? str.slice(0, n - 1) + "…" : str;
+}
+
+function parseTags(str) {
+  return str
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function getCheckedIds() {
+  return Array.from(document.querySelectorAll(".select-card:checked")).map(cb => cb.dataset.id);
+}
+
+================================================================================
+
+## FILE: manifest.json
+### Metadata
+- Size: 814 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+{
+  "manifest_version": 3,
+  "name": "VidTab Gallery",
+  "version": "1.0.1",
+  "description": "Save linked images as visual video bookmarks and view them in a full gallery tab.",
+  "permissions": ["storage", "tabs", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Open VidTab Gallery"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["contentStyles.css"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["gallery.html", "gallery.js", "gallery.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "128": "icons/128.png"
+  }
+}
+
+================================================================================
+
+## FILE: popup.html
+### Metadata
+- Size: 470 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>VidTab</title>
+  <style>
+    body { margin: 0; padding: 10px; font: 14px system-ui; width: 220px; }
+    button { width: 100%; padding: 8px; }
+    small { display: block; opacity: .7; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <button id="open">Open Gallery</button>
+  <small>Tip: hover a linked image on any website and click “＋ Save”.</small>
+  <script src="popup.js"></script>
+</body>
+</html>
+================================================================================
+
+## FILE: popup.js
+### Metadata
+- Size: 155 bytes
+- Last commit: 2025-08-13T13:23:02-04:00
+
+### Content
+document.getElementById("open").addEventListener("click", async () => {
+  await chrome.runtime.sendMessage({ type: "OPEN_GALLERY" });
+  window.close();
+});
+================================================================================
+

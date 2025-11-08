@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "VidTab Gallery",
+  "version": "1.1.0",
+  "description": "Save linked images as visual video bookmarks and view them in a full gallery tab. Now with manual add/edit and bookmarks.",
+  "permissions": ["storage", "tabs", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Open VidTab Gallery"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["contentStyles.css"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["gallery.html", "gallery.js", "gallery.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "128": "icons/128.png"
+  }
+}
