@@ -116,7 +116,7 @@ function buildButton(anchor, media) {
   btn.setAttribute("role", "button");
   btn.tabIndex = 0;
   btn.textContent = "＋ Save";
-  btn.title = "Save to VidTab Gallery";
+  btn.title = "Save to MediaMaker Gallery";
 
   const activate = async (event) => {
     event.preventDefault();

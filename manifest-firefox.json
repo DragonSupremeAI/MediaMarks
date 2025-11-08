@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "VidTab Gallery",
+  "version": "1.1.0",
+  "description": "Save linked images as visual video bookmarks and view them in a full gallery tab. Now with manual add/edit and bookmarks.",
+  "permissions": ["storage", "tabs", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Open VidTab Gallery"
+  },
+  "background": {
+    // Chrome uses service workers for background tasks under MV3.  Firefox does not yet support
+    // service workers, so we specify both the service worker and a fallback background script.
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["contentStyles.css"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["gallery.html", "gallery.js", "gallery.css"],
+      // Provide a match pattern for Firefox; Chrome allows omission of matches
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon.ico",
+    "32": "icons/icon.ico",
+    "128": "icons/icon.ico"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      // Use a pseudo‑GUID as an add‑on identifier.  It looks like an e‑mail address but does not
+      // correspond to any real account.  Using the same ID across your devices allows sync.
+      "id": "vizion@dragonsupremeai",
+      // Require Firefox 121 or later, which supports MV3 with both service workers and background scripts
+      "strict_min_version": "121.0",
+      // Indicate that this extension does not collect or transmit any user data off the device.  As
+      // of late 2025 this field is mandatory for new add‑on submissions.
+      "data_collection_permissions": {
+        "required": []
+      }
+    }
+  }
+}

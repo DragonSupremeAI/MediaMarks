@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "VidTab Gallery",
+  "name": "MediaMarker",
   "version": "1.1.0",
   "description": "Save linked images as visual video bookmarks and view them in a full gallery tab. Now with manual add/edit and bookmarks.",
   "permissions": ["storage", "tabs", "contextMenus"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_title": "Open VidTab Gallery"
+    "default_title": "Open MediaMaker Gallery"
   },
   "background": {
     "service_worker": "background.js"
@@ -26,8 +26,8 @@
     }
   ],
   "icons": {
-    "16": "icons/16.png",
-    "32": "icons/32.png",
-    "128": "icons/128.png"
+    "16": "icons/icon.ico",
+    "32": "icons/icon.ico",
+    "128": "icons/icon.ico"
   }
 }

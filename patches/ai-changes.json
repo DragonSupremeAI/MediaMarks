@@ -1,0 +1,41 @@
+[
+  {
+    "file": "background.js",
+    "action": "insert_after",
+    "anchor": "const GALLERY_PATH = \"gallery.html\";",
+    "content": "const API_BASE = 'http://localhost:3000';\nconst USER_ID = 'default-user';\n",
+    "description": "Define backend API URL and a default user ID for syncing.",
+    "feature": "sync"
+  },
+  {
+    "file": "background.js",
+    "action": "insert_after",
+    "anchor": "await chrome.storage.local.set({ items });",
+    "content": "  // Persist the item remotely for cross‑device synchronisation.\n  sendItemToServer(item).catch(err => console.error(err));",
+    "description": "Send newly saved bookmark to the backend API.",
+    "feature": "sync"
+  },
+  {
+    "file": "background.js",
+    "action": "append",
+    "content": "\n/**\n * Send a bookmark to the backend API. The server will upsert the record based on the item id and user_id.\n * Any network errors are logged but do not prevent local storage from being updated.\n */\nasync function sendItemToServer(item) {\n  const payload = { ...item, user_id: USER_ID };\n  try {\n    await fetch(`${API_BASE}/bookmarks`, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify(payload)\n    });\n  } catch (err) {\n    console.error('Failed to sync item to server', err);\n  }\n}\n\n/**\n * Fetch all bookmarks for this user from the backend and merge them into local storage.\n * New items from the server are appended to the local collection. Existing items are left untouched.\n */\nasync function syncFromServer() {\n  try {\n    const res = await fetch(`${API_BASE}/bookmarks?user_id=${encodeURIComponent(USER_ID)}`);\n    const data = await res.json();\n    const remoteItems = data.items || [];\n    const localData = await chrome.storage.local.get({ items: [] });\n    const localItems = localData.items;\n    let changed = false;\n    remoteItems.forEach(remote => {\n      if (!localItems.some(local => local.id === remote.id)) {\n        localItems.push(remote);\n        changed = true;\n      }\n    });\n    if (changed) {\n      await chrome.storage.local.set({ items: localItems });\n    }\n  } catch (err) {\n    console.error('Failed to sync bookmarks from server', err);\n  }\n}\n\n// Kick off a sync when the extension is installed or the browser starts.\nchrome.runtime.onInstalled.addListener(() => {\n  syncFromServer();\n});\n\nchrome.runtime.onStartup.addListener(() => {\n  syncFromServer();\n});\n",
+    "description": "Define helper functions to sync bookmarks with the backend and start syncing on install/startup.",
+    "feature": "sync"
+  },
+  {
+    "file": "gallery.js",
+    "action": "insert_after",
+    "anchor": "chrome.storage.onChanged.addListener((changes, area)",
+    "content": "\n  // Initialise import/export buttons if they exist in the gallery HTML.\n  const exportBtn = document.getElementById('export-btn');\n  const importInput = document.getElementById('import-btn');\n  if (exportBtn) {\n    exportBtn.addEventListener('click', async () => {\n      const data = await chrome.storage.local.get({ items: [] });\n      const blob = new Blob([JSON.stringify(data.items, null, 2)], { type: 'application/json' });\n      const url = URL.createObjectURL(blob);\n      const a = document.createElement('a');\n      a.href = url;\n      a.download = 'mediamarks-backup.json';\n      a.style.display = 'none';\n      document.body.appendChild(a);\n      a.click();\n      document.body.removeChild(a);\n      URL.revokeObjectURL(url);\n    });\n  }\n  if (importInput) {\n    importInput.addEventListener('change', async (event) => {\n      const file = event.target.files[0];\n      if (!file) return;\n      const text = await file.text();\n      try {\n        const imported = JSON.parse(text);\n        if (!Array.isArray(imported)) {\n          alert('Imported file does not contain an array of bookmarks.');\n          return;\n        }\n        const data = await chrome.storage.local.get({ items: [] });\n        const localItems = data.items;\n        let changed = false;\n        imported.forEach(item => {\n          if (!localItems.some(x => x.id === item.id)) {\n            localItems.push(item);\n            changed = true;\n          }\n        });\n        if (changed) {\n          await chrome.storage.local.set({ items: localItems });\n          renderAll();\n        }\n        event.target.value = '';\n        alert(`${imported.length} bookmarks imported`);\n      } catch (err) {\n        console.error(err);\n        alert('Failed to import bookmarks: ' + err.message);\n      }\n    });\n  }\n",
+    "description": "Add handlers to export bookmarks as a JSON file and import a backup file into local storage.",
+    "feature": "import-export"
+  },
+  {
+    "file": "gallery.html",
+    "action": "insert_after",
+    "anchor": "<button id=\"clear-all\"",
+    "content": "\n    <button id=\"export-btn\" title=\"Export bookmarks\">Export</button>\n    <input id=\"import-btn\" type=\"file\" accept=\"application/json\" title=\"Import bookmarks\" />\n",
+    "description": "Add Export and Import controls to the gallery actions bar.",
+    "feature": "import-export"
+  }
+]

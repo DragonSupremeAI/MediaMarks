@@ -165,7 +165,58 @@ let editPanelOpen = false;
     renderAll();
   });
 
-  chrome.storage.onChanged.addListener((changes, area) => {
+  chrome.storage.onChanged.addListener((changes, area)
+  // Initialise import/export buttons if they exist in the gallery HTML.
+  const exportBtn = document.getElementById('export-btn');
+  const importInput = document.getElementById('import-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get({ items: [] });
+      const blob = new Blob([JSON.stringify(data.items, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mediamarks-backup.json';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+  if (importInput) {
+    importInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const imported = JSON.parse(text);
+        if (!Array.isArray(imported)) {
+          alert('Imported file does not contain an array of bookmarks.');
+          return;
+        }
+        const data = await chrome.storage.local.get({ items: [] });
+        const localItems = data.items;
+        let changed = false;
+        imported.forEach(item => {
+          if (!localItems.some(x => x.id === item.id)) {
+            localItems.push(item);
+            changed = true;
+          }
+        });
+        if (changed) {
+          await chrome.storage.local.set({ items: localItems });
+          renderAll();
+        }
+        event.target.value = '';
+        alert(`${imported.length} bookmarks imported`);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to import bookmarks: ' + err.message);
+      }
+    });
+  }
+ => {
     if (area === "local" && changes.items) {
       items = changes.items.newValue || [];
       renderAll();

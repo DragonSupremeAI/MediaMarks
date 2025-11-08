@@ -2,19 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>VidTab Gallery</title>
+<title>MediaMarker Gallery</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="gallery.css" />
 </head>
 <body>
 <header class="topbar">
-  <h1>VidTab Gallery</h1>
+  <h1>MediaMarker Gallery</h1>
   <div class="actions">
     <input id="search" type="search" placeholder="Search title, URL, or tags…" />
     <button id="add-manual" title="Add a manual entry">Add Entry</button>
     <button id="edit-mode" title="Batch edit">Edit</button>
     <button id="delete-mode" title="Batch delete">Delete</button>
-    <button id="clear-all" title="Remove everything">Clear All</button>
+    <button id="clear-all"
+    <button id="export-btn" title="Export bookmarks">Export</button>
+    <input id="import-btn" type="file" accept="application/json" title="Import bookmarks" />
+ title="Remove everything">Clear All</button>
   </div>
 </header>
 <section id="manual-add-panel" class="control-panel" hidden>

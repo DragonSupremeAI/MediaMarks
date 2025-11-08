@@ -1,0 +1,47 @@
+[
+  {
+    "id": "5ad18c2e",
+    "timestamp": "2025-11-07 23:53:09",
+    "file": "background.js",
+    "action": "insert_after",
+    "anchor": "const GALLERY_PATH = \"gallery.html\";",
+    "backup": ".ai_backups/background.js.f4ba9ab6.bak",
+    "summary": "const API_BASE = 'http://localhost:3000'; const USER_ID = 'default-user'; ..."
+  },
+  {
+    "id": "06356ba2",
+    "timestamp": "2025-11-07 23:53:09",
+    "file": "background.js",
+    "action": "insert_after",
+    "anchor": "await chrome.storage.local.set({ items });",
+    "backup": ".ai_backups/background.js.614c0e25.bak",
+    "summary": "  // Persist the item remotely for cross\u2011device synchronisation.   sendItemToSer..."
+  },
+  {
+    "id": "2247926b",
+    "timestamp": "2025-11-07 23:53:09",
+    "file": "background.js",
+    "action": "append",
+    "anchor": null,
+    "backup": ".ai_backups/background.js.e5151571.bak",
+    "summary": " /**  * Send a bookmark to the backend API. The server will upsert the record ba..."
+  },
+  {
+    "id": "4eac93ea",
+    "timestamp": "2025-11-07 23:53:09",
+    "file": "gallery.js",
+    "action": "insert_after",
+    "anchor": "chrome.storage.onChanged.addListener((changes, area)",
+    "backup": ".ai_backups/gallery.js.a7282a82.bak",
+    "summary": "   // Initialise import/export buttons if they exist in the gallery HTML.   cons..."
+  },
+  {
+    "id": "7b130224",
+    "timestamp": "2025-11-07 23:53:09",
+    "file": "gallery.html",
+    "action": "insert_after",
+    "anchor": "<button id=\"clear-all\"",
+    "backup": ".ai_backups/gallery.html.cc9274b9.bak",
+    "summary": "     <button id=\"export-btn\" title=\"Export bookmarks\">Export</button>     <input..."
+  }
+]

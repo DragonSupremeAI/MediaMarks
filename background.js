@@ -1,12 +1,14 @@
 // background.js (MV3 service worker)
 
-const GALLERY_PATH = "gallery.html";
+const GALLERY_PATH = "gallery.html";const API_BASE = 'http://localhost:3000';
+const USER_ID = 'default-user';
+
 
 // Create context menu to save from linked images
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "vidtab-save-image-link",
-    title: "Save to VidTab Gallery",
+    title: "Save to MediaMaker Gallery",
     contexts: ["image"]
   });
 });
@@ -56,7 +58,8 @@ async function addItem(item) {
   // Prevent duplicates
   if (!items.some(x => x.url === item.url && x.img === item.img)) {
     items.unshift(item);
-    await chrome.storage.local.set({ items });
+    await chrome.storage.local.set({ items });  // Persist the item remotely for cross‑device synchronisation.
+  sendItemToServer(item).catch(err => console.error(err));
   }
 }
 
@@ -70,3 +73,56 @@ async function openGalleryTab() {
     await chrome.tabs.create({ url });
   }
 }
+
+
+/**
+ * Send a bookmark to the backend API. The server will upsert the record based on the item id and user_id.
+ * Any network errors are logged but do not prevent local storage from being updated.
+ */
+async function sendItemToServer(item) {
+  const payload = { ...item, user_id: USER_ID };
+  try {
+    await fetch(`${API_BASE}/bookmarks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    console.error('Failed to sync item to server', err);
+  }
+}
+
+/**
+ * Fetch all bookmarks for this user from the backend and merge them into local storage.
+ * New items from the server are appended to the local collection. Existing items are left untouched.
+ */
+async function syncFromServer() {
+  try {
+    const res = await fetch(`${API_BASE}/bookmarks?user_id=${encodeURIComponent(USER_ID)}`);
+    const data = await res.json();
+    const remoteItems = data.items || [];
+    const localData = await chrome.storage.local.get({ items: [] });
+    const localItems = localData.items;
+    let changed = false;
+    remoteItems.forEach(remote => {
+      if (!localItems.some(local => local.id === remote.id)) {
+        localItems.push(remote);
+        changed = true;
+      }
+    });
+    if (changed) {
+      await chrome.storage.local.set({ items: localItems });
+    }
+  } catch (err) {
+    console.error('Failed to sync bookmarks from server', err);
+  }
+}
+
+// Kick off a sync when the extension is installed or the browser starts.
+chrome.runtime.onInstalled.addListener(() => {
+  syncFromServer();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  syncFromServer();
+});

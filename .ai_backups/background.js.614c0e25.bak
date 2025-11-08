@@ -1,0 +1,74 @@
+// background.js (MV3 service worker)
+
+const GALLERY_PATH = "gallery.html";const API_BASE = 'http://localhost:3000';
+const USER_ID = 'default-user';
+
+
+// Create context menu to save from linked images
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "vidtab-save-image-link",
+    title: "Save to VidTab Gallery",
+    contexts: ["image"]
+  });
+});
+
+// Clicking the extension icon opens gallery
+chrome.action.onClicked.addListener(openGalleryTab);
+
+// Handle messages from popup or content script
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "OPEN_GALLERY") {
+    openGalleryTab().then(() => sendResponse({ ok: true }));
+    return true; // keep port open for async
+  }
+
+  if (msg?.type === "SAVE_ITEM_FROM_CONTEXT") {
+    addItem(msg.payload)
+      .then(() => sendResponse({ ok: true }))
+      .catch(e => sendResponse({ ok: false, error: String(e) }));
+    return true; // keep port open for async
+  }
+});
+
+// Context menu click handler
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "vidtab-save-image-link") return;
+
+  const payload = {
+    id: makeId(),
+    url: info.linkUrl || info.pageUrl,
+    img: info.srcUrl,
+    title: tab?.title || info.linkUrl || info.pageUrl,
+    sourcePageUrl: info.pageUrl,
+    tags: [],
+    createdAt: Date.now()
+  };
+  await addItem(payload);
+});
+
+function makeId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function addItem(item) {
+  const data = await chrome.storage.local.get({ items: [] });
+  const items = data.items;
+
+  // Prevent duplicates
+  if (!items.some(x => x.url === item.url && x.img === item.img)) {
+    items.unshift(item);
+    await chrome.storage.local.set({ items });
+  }
+}
+
+async function openGalleryTab() {
+  const url = chrome.runtime.getURL(GALLERY_PATH);
+  const tabs = await chrome.tabs.query({ url });
+
+  if (tabs.length > 0) {
+    await chrome.tabs.update(tabs[0].id, { active: true });
+  } else {
+    await chrome.tabs.create({ url });
+  }
+}
