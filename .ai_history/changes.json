@@ -43,5 +43,23 @@
     "anchor": "<button id=\"clear-all\"",
     "backup": ".ai_backups/gallery.html.cc9274b9.bak",
     "summary": "     <button id=\"export-btn\" title=\"Export bookmarks\">Export</button>     <input..."
+  },
+  {
+    "id": "e2e1fb61",
+    "timestamp": "2025-11-08 04:10:23",
+    "file": "gallery.html",
+    "action": "replace",
+    "anchor": "<button id=\"clear-all\"",
+    "backup": ".ai_backups/gallery.html.5d5eadb9.bak",
+    "summary": "<button id=\"clear-all\" title=\"Remove everything\">Clear All</button>..."
+  },
+  {
+    "id": "d056422c",
+    "timestamp": "2025-11-08 04:10:23",
+    "file": "gallery.html",
+    "action": "replace",
+    "anchor": "title=\"Remove everything\">Clear All</button>",
+    "backup": ".ai_backups/gallery.html.2ab831d7.bak",
+    "summary": "..."
   }
 ]

@@ -14,10 +14,10 @@
     <button id="add-manual" title="Add a manual entry">Add Entry</button>
     <button id="edit-mode" title="Batch edit">Edit</button>
     <button id="delete-mode" title="Batch delete">Delete</button>
-    <button id="clear-all" 
+    <button id="clear-all" title="Remove everything">Clear All</button>
     <button id="export-btn" title="Export bookmarks">Export</button>
     <input id="import-btn" type="file" accept="application/json" title="Import bookmarks" />
- 
+ title="Remove everything">Clear All</button>
   </div>
 </header>
 <section id="manual-add-panel" class="control-panel" hidden>

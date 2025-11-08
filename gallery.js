@@ -165,8 +165,13 @@ let editPanelOpen = false;
     renderAll();
   });
 
-  chrome.storage.onChanged.addListener((changes, area)
-  // Initialise import/export buttons if they exist in the gallery HTML.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.items) {
+      items = changes.items.newValue || [];
+      renderAll();
+    }
+  });
+
   const exportBtn = document.getElementById('export-btn');
   const importInput = document.getElementById('import-btn');
   if (exportBtn) {

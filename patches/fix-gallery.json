@@ -1,0 +1,18 @@
+[
+  {
+    "file": "gallery.html",
+    "action": "replace",
+    "anchor": "<button id=\"clear-all\"",
+    "content": "<button id=\"clear-all\" title=\"Remove everything\">Clear All</button>",
+    "description": "Fix broken Clear All button markup",
+    "feature": "fix-gallery"
+  },
+  {
+    "file": "gallery.html",
+    "action": "replace",
+    "anchor": "title=\"Remove everything\">Clear All</button>",
+    "content": "",
+    "description": "Remove stray Clear All markup causing broken layout",
+    "feature": "fix-gallery"
+  }
+]
