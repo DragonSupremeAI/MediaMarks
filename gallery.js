@@ -368,7 +368,7 @@ function renderGrid(list) {
     linkA.textContent = truncate(item.url, 48);
     linkA.title = item.url;
 
-    if (!batchMode) {
+    if (batchMode === "edit") {
       const actions = document.createElement("div");
       actions.className = "card-actions";
       const editBtn = document.createElement("button");
@@ -451,11 +451,15 @@ function openManualPanelForCreate() {
 }
 
 function openSingleEdit(item) {
-  if (editPanelOpen) {
-    closeEditPanel();
-    renderAll();
-  } else if (batchMode) {
+  if (batchMode === "delete") {
     batchMode = null;
+    renderAll();
+  }
+  if (!editPanelOpen) {
+    batchMode = "edit";
+    editPanelOpen = true;
+    globalEditPanel.hidden = false;
+    editModeBtn.textContent = "Submit";
     renderAll();
   }
   manualPanel.hidden = false;
