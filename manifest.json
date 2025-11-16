@@ -3,7 +3,7 @@
   "name": "MediaMarker",
   "version": "1.1.0",
   "description": "Save linked images as visual video bookmarks and view them in a full gallery tab. Now with manual add/edit and bookmarks.",
-  "permissions": ["storage", "tabs", "contextMenus"],
+  "permissions": ["storage", "tabs", "contextMenus", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Open MediaMaker Gallery"

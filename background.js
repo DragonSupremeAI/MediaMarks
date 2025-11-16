@@ -34,6 +34,11 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Save to MediaMaker Gallery",
     contexts: ["image"]
   });
+  chrome.contextMenus.create({
+    id: "vidtab-screenshot",
+    title: "Take Screenshot and Save",
+    contexts: ["page"]
+  });
 });
 
 // Clicking the extension icon opens gallery
@@ -52,22 +57,56 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch(e => sendResponse({ ok: false, error: String(e) }));
     return true; // keep port open for async
   }
+
+  if (msg?.type === "CAPTURE_SCREENSHOT") {
+    chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataURL) => {
+      sendResponse({ dataURL });
+    });
+    return true;
+  }
+
+  if (msg?.type === "POPULATE_POPUP") {
+    openGalleryTab().then(() => {
+      // Send to gallery tab after a delay to ensure it's loaded
+      setTimeout(() => {
+        chrome.tabs.query({ url: chrome.runtime.getURL(GALLERY_PATH) }, (tabs) => {
+          if (tabs.length > 0) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'POPULATE_ADD_PANEL', data: msg });
+          }
+        });
+      }, 1000);
+    });
+    return true;
+  }
+
+  if (msg?.type === "UPLOAD_SCREENSHOT") {
+    uploadToPostimg(msg.dataURL).then(directLink => {
+      sendResponse({ directLink });
+    });
+    return true;
+  }
 });
 
 // Context menu click handler
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== "vidtab-save-image-link") return;
-
-  const payload = {
-    id: makeId(),
-    url: info.linkUrl || info.pageUrl,
-    img: info.srcUrl,
-    title: tab?.title || info.linkUrl || info.pageUrl,
-    sourcePageUrl: info.pageUrl,
-    tags: [],
-    createdAt: Date.now()
-  };
-  await addItem(payload);
+  if (info.menuItemId === "vidtab-save-image-link") {
+    const payload = {
+      id: makeId(),
+      url: info.linkUrl || info.pageUrl,
+      img: info.srcUrl,
+      title: tab?.title || info.linkUrl || info.pageUrl,
+      sourcePageUrl: info.pageUrl,
+      tags: [],
+      createdAt: Date.now()
+    };
+    await addItem(payload);
+  } else if (info.menuItemId === "vidtab-screenshot") {
+    // Inject screenshot script
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["screenshot.js"]
+    });
+  }
 });
 
 function makeId() {
@@ -122,6 +161,13 @@ async function sendItemToServer(item) {
 async function syncFromServer() {
   try {
     const res = await fetch(`${API_BASE}/bookmarks?user_id=${encodeURIComponent(USER_ID)}`);
+    if (!res.ok) {
+      throw new Error(`Server responded with ${res.status}`);
+    }
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Server did not return JSON');
+    }
     const data = await res.json();
     const remoteItems = data.items || [];
     const localData = await storageGet({ items: [] });
@@ -142,10 +188,44 @@ async function syncFromServer() {
 }
 
 // Kick off a sync when the extension is installed or the browser starts.
-chrome.runtime.onInstalled.addListener(() => {
-  syncFromServer();
-});
+// Disabled server sync to avoid errors when server is not running.
+// chrome.runtime.onInstalled.addListener(() => {
+//   syncFromServer();
+// });
 
-chrome.runtime.onStartup.addListener(() => {
-  syncFromServer();
-});
+// chrome.runtime.onStartup.addListener(() => {
+//   syncFromServer();
+// });
+
+async function uploadToPostimg(dataURL) {
+  try {
+    // Convert dataURL to blob
+    const response = await fetch(dataURL);
+    const blob = await response.blob();
+    const formData = new FormData();
+    // First, get token
+    const tokenResponse = await fetch('https://postimages.org/');
+    const tokenText = await tokenResponse.text();
+    const tokenMatch = tokenText.match(/"token"[^}]*"([^"]*)"/);
+    const token = tokenMatch ? tokenMatch[1] : '';
+    formData.append('file', blob, 'screenshot.png');
+    formData.append('token', token);
+    formData.append('expire', '0');
+    formData.append('numfiles', '1');
+    formData.append('optsize', '0');
+    formData.append('session_upload', Date.now().toString());
+    formData.append('upload_referer', 'aHR0cHM6Ly9wb3N0aW1nLmNjLw==');
+    formData.append('upload_session', 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+    formData.append('adult', '0');
+
+    const uploadResponse = await fetch('https://postimages.org/json/rr', {
+      method: 'POST',
+      body: formData
+    });
+    const result = await uploadResponse.json();
+    return result.url ? 'https:' + result.url : null;
+  } catch (err) {
+    console.error('Upload failed', err);
+    return null;
+  }
+}

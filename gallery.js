@@ -184,10 +184,29 @@ function storageSet(values) {
   });
 
   cancelEditBtn.addEventListener("click", () => {
-    if (!editPanelOpen) return;
     closeEditPanel();
     renderAll();
   });
+
+  // Message listener for populating add panel
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'POPULATE_ADD_PANEL') {
+      const { imageUrl, url, title } = msg.data;
+      manualImg.value = imageUrl;
+      manualUrl.value = url || '';
+      manualTitle.value = title || '';
+      // Open the panel
+      if (!manualPanelOpen) {
+        manualPanel.hidden = false;
+        manualPanelOpen = true;
+        addManualBtn.textContent = "Submit";
+      }
+      manualUrl.focus();
+    }
+  });
+
+  await loadItems();
+  renderAll();
 
   // Listen for changes to the items in storage
   chrome.storage.onChanged.addListener((changes, area) => {
