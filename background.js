@@ -223,7 +223,10 @@ async function uploadToPostimg(dataURL) {
       body: formData
     });
     const result = await uploadResponse.json();
-    return result.url ? 'https:' + result.url : null;
+    if (!result.url) {
+      return null;
+    }
+    return result.url.startsWith('http') ? result.url : `https:${result.url}`;
   } catch (err) {
     console.error('Upload failed', err);
     return null;

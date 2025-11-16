@@ -156,6 +156,17 @@ button.save:hover { background: rgba(55,214,122,0.1); }
 button.delete { border-color: #7a2b35; color: #ff96a1; }
 button.delete:hover { background: rgba(255,93,108,0.08); }
 
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+.card-action {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
 .tab { background: transparent; border: 1px solid var(--border); padding:6px 8px; border-radius:6px; cursor:pointer; color:var(--muted); }
 .tab.active { color:var(--text); border-color:var(--accent); }
 

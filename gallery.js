@@ -26,6 +26,7 @@ let searchTerm = "";
 let batchMode = null; // "edit" | "delete" | null
 let manualPanelOpen = false;
 let editPanelOpen = false;
+let editingItemId = null;
 
 function storageGet(defaults) {
   return new Promise((resolve, reject) => {
@@ -137,17 +138,7 @@ function storageSet(values) {
 
   addManualBtn.addEventListener("click", async () => {
     if (!manualPanelOpen) {
-      if (editPanelOpen) {
-        closeEditPanel();
-        renderAll();
-      } else if (batchMode === "delete") {
-        batchMode = null;
-        renderAll();
-      }
-      manualPanel.hidden = false;
-      manualPanelOpen = true;
-      addManualBtn.textContent = "Submit";
-      manualUrl.focus();
+      openManualPanelForCreate();
       return;
     }
 
@@ -158,23 +149,39 @@ function storageSet(values) {
       return;
     }
 
-    const payload = {
-      id: makeId(),
-      url,
-      img,
-      title: manualTitle.value.trim() || url,
-      tags: parseTags(manualTags.value),
-      sourcePageUrl: url,
-      createdAt: Date.now()
-    };
+    const title = manualTitle.value.trim() || url;
+    const tags = parseTags(manualTags.value);
 
-    // Save
-    items.unshift(payload);
-    await storageSet({ items });
+    if (editingItemId) {
+      items = items.map(it => {
+        if (it.id === editingItemId) {
+          return {
+            ...it,
+            url,
+            img,
+            title,
+            tags,
+            sourcePageUrl: url
+          };
+        }
+        return it;
+      });
+      await storageSet({ items });
+    } else {
+      const payload = {
+        id: makeId(),
+        url,
+        img,
+        title,
+        tags,
+        sourcePageUrl: url,
+        createdAt: Date.now()
+      };
+      items.unshift(payload);
+      await storageSet({ items });
+    }
 
-    // Reset form / close panel
     closeManualPanel();
-
     renderAll();
   });
 
@@ -192,6 +199,7 @@ function storageSet(values) {
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'POPULATE_ADD_PANEL') {
       const { imageUrl, url, title } = msg.data;
+      editingItemId = null;
       manualImg.value = imageUrl;
       manualUrl.value = url || '';
       manualTitle.value = title || '';
@@ -360,6 +368,20 @@ function renderGrid(list) {
     linkA.textContent = truncate(item.url, 48);
     linkA.title = item.url;
 
+    if (!batchMode) {
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "card-action";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        openSingleEdit(item);
+      });
+      actions.appendChild(editBtn);
+      node.appendChild(actions);
+    }
+
     grid.appendChild(node);
   });
 }
@@ -395,6 +417,7 @@ function closeManualPanel() {
   resetManualForm();
   manualPanel.hidden = true;
   manualPanelOpen = false;
+  editingItemId = null;
   addManualBtn.textContent = "Add Entry";
 }
 
@@ -410,4 +433,38 @@ function closeEditPanel() {
   batchMode = null;
   globalEditPanel.hidden = true;
   editModeBtn.textContent = "Edit";
+}
+
+function openManualPanelForCreate() {
+  if (editPanelOpen) {
+    closeEditPanel();
+    renderAll();
+  } else if (batchMode === "delete") {
+    batchMode = null;
+    renderAll();
+  }
+  editingItemId = null;
+  manualPanel.hidden = false;
+  manualPanelOpen = true;
+  addManualBtn.textContent = "Submit";
+  manualUrl.focus();
+}
+
+function openSingleEdit(item) {
+  if (editPanelOpen) {
+    closeEditPanel();
+    renderAll();
+  } else if (batchMode) {
+    batchMode = null;
+    renderAll();
+  }
+  manualPanel.hidden = false;
+  manualPanelOpen = true;
+  editingItemId = item.id;
+  manualUrl.value = item.url || "";
+  manualImg.value = item.img || "";
+  manualTitle.value = item.title || "";
+  manualTags.value = (item.tags || []).join(", ");
+  addManualBtn.textContent = "Save";
+  manualUrl.focus();
 }
