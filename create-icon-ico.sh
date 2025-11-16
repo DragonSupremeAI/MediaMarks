@@ -15,10 +15,10 @@ for size in 16 32 48 128; do
 done
 
 echo "🧱 Combining resized PNGs into .ico file..."
-ffmpeg -y -i "$ICON_BASE-16x16.png" \
-       -i "$ICON_BASE-32x32.png" \
-       -i "$ICON_BASE-32\\48x48.png" \
-       -i "$ICON_BASE-128x128.png" \
+ffmpeg -y -i "16.png" \
+       -i "$32.png" \
+       -i "48.png" \
+       -i "128.png" \
        -filter_complex "[0:v][1:v][2:v]concat=n=3:v=1:a=0[out]" \
        -map "[out]" "$ICO_OUTPUT"
 

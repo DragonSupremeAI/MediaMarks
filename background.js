@@ -3,6 +3,29 @@
 const GALLERY_PATH = "gallery.html";const API_BASE = 'http://localhost:3000';
 const USER_ID = 'default-user';
 
+function storageGet(defaults) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(defaults, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve(result);
+    });
+  });
+}
+
+function storageSet(values) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(values, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve();
+    });
+  });
+}
 
 // Create context menu to save from linked images
 chrome.runtime.onInstalled.addListener(() => {
@@ -52,14 +75,14 @@ function makeId() {
 }
 
 async function addItem(item) {
-  const data = await chrome.storage.local.get({ items: [] });
+  const data = await storageGet({ items: [] });
   const items = data.items;
 
   // Prevent duplicates
   if (!items.some(x => x.url === item.url && x.img === item.img)) {
     items.unshift(item);
-    await chrome.storage.local.set({ items });  // Persist the item remotely for cross‑device synchronisation.
-  sendItemToServer(item).catch(err => console.error(err));
+    await storageSet({ items });  // Persist the item remotely for cross-device synchronisation.
+    sendItemToServer(item).catch(err => console.error(err));
   }
 }
 
@@ -101,7 +124,7 @@ async function syncFromServer() {
     const res = await fetch(`${API_BASE}/bookmarks?user_id=${encodeURIComponent(USER_ID)}`);
     const data = await res.json();
     const remoteItems = data.items || [];
-    const localData = await chrome.storage.local.get({ items: [] });
+    const localData = await storageGet({ items: [] });
     const localItems = localData.items;
     let changed = false;
     remoteItems.forEach(remote => {
@@ -111,7 +134,7 @@ async function syncFromServer() {
       }
     });
     if (changed) {
-      await chrome.storage.local.set({ items: localItems });
+      await storageSet({ items: localItems });
     }
   } catch (err) {
     console.error('Failed to sync bookmarks from server', err);

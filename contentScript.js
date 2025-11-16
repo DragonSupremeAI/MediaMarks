@@ -141,10 +141,13 @@ function buildButton(anchor, media) {
     };
 
     try {
-      await chrome.runtime.sendMessage({ type: "SAVE_ITEM_FROM_CONTEXT", payload });
+      const response = await chrome.runtime.sendMessage({ type: "SAVE_ITEM_FROM_CONTEXT", payload });
+      if (!response?.ok) {
+        throw new Error(response?.error || "Background rejected the save request");
+      }
       showToast("Saved to VidTab Gallery ✔️");
     } catch (err) {
-      showToast("Couldn’t save. Check extension permissions.");
+      showToast(`Couldn’t save: ${err?.message || "Check extension permissions."}`);
       console.error(err);
     }
   };
@@ -163,6 +166,22 @@ function buildButton(anchor, media) {
 function resolveMediaUrl(media) {
   if (!media) return null;
 
+  if (media.tagName === "VIDEO") {
+    const posterSources = [
+      media.getAttribute("poster"),
+      media.getAttribute("data-poster"),
+      media.getAttribute("data-thumbnail"),
+      media.dataset?.poster,
+      media.dataset?.thumbnail,
+      media.dataset?.thumb
+    ].filter(Boolean);
+
+    const poster = posterSources.find(Boolean);
+    if (poster) {
+      return absolutizeUrl(poster);
+    }
+  }
+
   // If we fabricated a ghost <img>, just take its src directly.
   if (!media.isConnected && media.tagName === "IMG") {
     return absolutizeUrl(media.src);
@@ -174,11 +193,6 @@ function resolveMediaUrl(media) {
 
   if ("src" in media && media.src) {
     return absolutizeUrl(media.src);
-  }
-
-  if (media.tagName === "VIDEO") {
-    const poster = media.getAttribute("poster");
-    if (poster) return absolutizeUrl(poster);
   }
 
   const dataSrcAttr = ["data-src", "data-lazy-src", "data-original", "data-thumb", "data-thumbnail-url"];

@@ -27,6 +27,30 @@ let batchMode = null; // "edit" | "delete" | null
 let manualPanelOpen = false;
 let editPanelOpen = false;
 
+function storageGet(defaults) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(defaults, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve(result);
+    });
+  });
+}
+
+function storageSet(values) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(values, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 (async function init() {
   await loadItems();
   renderAll();
@@ -41,7 +65,7 @@ let editPanelOpen = false;
   clearAllBtn.addEventListener("click", async () => {
     if (!confirm("Delete ALL saved items? This cannot be undone.")) return;
     items = [];
-    await chrome.storage.local.set({ items });
+    await storageSet({ items });
     renderAll();
   });
 
@@ -84,7 +108,7 @@ let editPanelOpen = false;
       }
       return it;
     });
-    await chrome.storage.local.set({ items });
+    await storageSet({ items });
 
     closeEditPanel();
     renderAll();
@@ -95,7 +119,7 @@ let editPanelOpen = false;
       const checked = getCheckedIds();
       if (checked.length && confirm(`Delete ${checked.length} items?`)) {
         items = items.filter(it => !checked.includes(it.id));
-        await chrome.storage.local.set({ items });
+        await storageSet({ items });
       }
       batchMode = null;
       renderAll();
@@ -146,7 +170,7 @@ let editPanelOpen = false;
 
     // Save
     items.unshift(payload);
-    await chrome.storage.local.set({ items });
+    await storageSet({ items });
 
     // Reset form / close panel
     closeManualPanel();
@@ -165,6 +189,7 @@ let editPanelOpen = false;
     renderAll();
   });
 
+  // Listen for changes to the items in storage
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.items) {
       items = changes.items.newValue || [];
@@ -172,11 +197,12 @@ let editPanelOpen = false;
     }
   });
 
+  // Initialise import/export buttons if they exist in the gallery HTML.
   const exportBtn = document.getElementById('export-btn');
   const importInput = document.getElementById('import-btn');
   if (exportBtn) {
     exportBtn.addEventListener('click', async () => {
-      const data = await chrome.storage.local.get({ items: [] });
+      const data = await storageGet({ items: [] });
       const blob = new Blob([JSON.stringify(data.items, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -200,7 +226,7 @@ let editPanelOpen = false;
           alert('Imported file does not contain an array of bookmarks.');
           return;
         }
-        const data = await chrome.storage.local.get({ items: [] });
+        const data = await storageGet({ items: [] });
         const localItems = data.items;
         let changed = false;
         imported.forEach(item => {
@@ -210,7 +236,7 @@ let editPanelOpen = false;
           }
         });
         if (changed) {
-          await chrome.storage.local.set({ items: localItems });
+          await storageSet({ items: localItems });
           renderAll();
         }
         event.target.value = '';
@@ -221,17 +247,16 @@ let editPanelOpen = false;
       }
     });
   }
- => {
-    if (area === "local" && changes.items) {
-      items = changes.items.newValue || [];
-      renderAll();
-    }
-  });
-})();
+})();  // End of the IIFE
 
 async function loadItems() {
-  const data = await chrome.storage.local.get({ items: [] });
-  items = data.items;
+  try {
+    const data = await storageGet({ items: [] });
+    items = data.items;
+  } catch (err) {
+    console.error("Failed to load saved items from storage", err);
+    items = [];
+  }
 }
 
 function renderAll() {
